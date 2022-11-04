@@ -31,6 +31,7 @@ use Magento\FunctionalTestingFramework\Test\Util\ActionMergeUtil;
 use Magento\FunctionalTestingFramework\Util\Path\FilePathFormatter;
 use Mustache_Engine;
 use Mustache_Loader_FilesystemLoader;
+use Magento\FunctionalTestingFramework\DataGenerator\Handlers\DataObjectHandler;
 
 /**
  * Class TestGenerator
@@ -258,6 +259,7 @@ class TestGenerator
      */
     public function assembleTestPhp($testObject)
     {
+        $this->customHelpers = [];
         $usePhp = $this->generateUseStatementsPhp();
 
         $className = $testObject->getCodeceptionName();
@@ -271,7 +273,7 @@ class TestGenerator
         } catch (TestReferenceException $e) {
             throw new TestReferenceException($e->getMessage() . "\n" . $testObject->getFilename());
         }
-        $classAnnotationsPhp = $this->generateAnnotationsPhp($testObject->getAnnotations());
+        $classAnnotationsPhp = $this->generateAnnotationsPhp($testObject);
 
         $cestPhp = "<?php\n";
         $cestPhp .= "namespace Magento\AcceptanceTest\\_" . $this->exportDirName . "\Backend;\n\n";
@@ -447,12 +449,13 @@ class TestGenerator
     /**
      * Generates Annotations PHP for given object, using given scope to determine indentation and additional output.
      *
-     * @param array   $annotationsObject
+     * @param array   $testObject
      * @param boolean $isMethod
      * @return string
      */
-    private function generateAnnotationsPhp($annotationsObject, $isMethod = false)
+    private function generateAnnotationsPhp($testObject, $isMethod = false)
     {
+        $annotationsObject = $testObject->getAnnotations();
         //TODO: Refactor to deal with PHPMD.CyclomaticComplexity
         if ($isMethod) {
             $indent = "\t";
@@ -468,7 +471,7 @@ class TestGenerator
                 continue;
             }
             if (!$isMethod) {
-                $annotationsPhp .= $this->generateClassAnnotations($annotationType, $annotationName);
+                $annotationsPhp .= $this->generateClassAnnotations($annotationType, $annotationName, $testObject);
             } else {
                 $annotationsPhp .= $this->generateMethodAnnotations($annotationType, $annotationName);
             }
@@ -525,11 +528,7 @@ class TestGenerator
                 break;
 
             case null:
-                $annotationToAppend = sprintf(
-                    "{$indent} * @Parameter(name = \"%s\", value=\"$%s\")\n",
-                    "AcceptanceTester",
-                    "I"
-                );
+                $annotationToAppend = "";
                 $annotationToAppend .= sprintf("{$indent} * @param %s $%s\n", "AcceptanceTester", "I");
                 $annotationToAppend .= "{$indent} * @return void\n";
                 $annotationToAppend .= "{$indent} * @throws \Exception\n";
@@ -538,19 +537,41 @@ class TestGenerator
 
         return $annotationToAppend;
     }
+    /**
+     * Returs required credentials to configure
+     *
+     * @param TestObject $testObject
+     * @return string
+     */
+    public function requiredCredentials($testObject)
+    {
+        $requiredCredentials = (!empty($testObject->getCredentials()))
+            ?  implode(",", $testObject->getCredentials())
+            : "";
+
+        return $requiredCredentials;
+    }
 
     /**
      * Method which return formatted class level annotations based on type and name(s).
      *
      * @param string $annotationType
      * @param array  $annotationName
+     * @param array  $testObject
      * @return null|string
      * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
-    private function generateClassAnnotations($annotationType, $annotationName)
+    private function generateClassAnnotations($annotationType, $annotationName, $testObject)
     {
         $annotationToAppend = null;
-
+        if (!$testObject->isSkipped() && !empty($annotationName['main'])) {
+            $requiredCredentialsMessage = $this->requiredCredentials($testObject);
+            $credMsg = "\n\n"."This test uses the following credentials:"."\n";
+            $annotationName = (!empty($requiredCredentialsMessage)) ?
+                ['main'=>$annotationName['main'].', '.$credMsg.''.$requiredCredentialsMessage,
+                'test_files'=> "\n".$annotationName['test_files'], 'deprecated'=>$annotationName['deprecated']]
+                : $annotationName;
+        }
         switch ($annotationType) {
             case "title":
                 $annotationToAppend = sprintf(" * @Title(\"%s\")\n", $annotationName[0]);
@@ -775,6 +796,11 @@ class TestGenerator
                 $selector = $this->addUniquenessFunctionCall($customActionAttributes['selector']);
                 $selector = $this->resolveLocatorFunctionInAttribute($selector);
             }
+            if (isset($customActionAttributes['count'])) {
+                $countClickValue = $customActionAttributes['count'];
+                $countValue = $this->addUniquenessFunctionCall($countClickValue);
+                $countValue = $this->resolveLocatorFunctionInAttribute($countValue);
+            }
 
             if (isset($customActionAttributes['selector1']) || isset($customActionAttributes['filterSelector'])) {
                 $selectorOneValue = $customActionAttributes['selector1'] ?? $customActionAttributes['filterSelector'];
@@ -898,11 +924,16 @@ class TestGenerator
                         $stepKey,
                         $customActionAttributes['class'] . '::' . $customActionAttributes['method']
                     );
-                    $testSteps .= $this->wrapFunctionCall($actor, $actionObject, $arguments);
+                    $testSteps .= $this->wrapFunctionCallWithReturnValue(
+                        $stepKey,
+                        $actor,
+                        $actionObject,
+                        $arguments
+                    );
                     break;
                 case "createData":
                     $entity = $customActionAttributes['entity'];
-
+                    $this->entityExistsCheck($entity, $stepKey);
                     //TODO refactor entity field override to not be individual actionObjects
                     $customEntityFields =
                         $customActionAttributes[ActionObjectExtractor::ACTION_OBJECT_PERSISTENCE_FIELDS] ?? [];
@@ -920,7 +951,6 @@ class TestGenerator
                     if (!empty($requiredEntityKeys)) {
                         $requiredEntityKeysArray = '"' . implode('", "', $requiredEntityKeys) . '"';
                     }
-
                     $scope = $this->getObjectScope($generationScope);
 
                     $createEntityFunctionCall = "\t\t\${$actor}->createEntity(";
@@ -1092,6 +1122,7 @@ class TestGenerator
                         $parameterArray
                     );
                     break;
+                case "grabCookieAttributes":
                 case "grabCookie":
                     $testSteps .= $this->wrapFunctionCallWithReturnValue(
                         $stepKey,
@@ -1155,6 +1186,14 @@ class TestGenerator
                         $selector2,
                         $x,
                         $y
+                    );
+                    break;
+                case "rapidClick":
+                    $testSteps .= $this->wrapFunctionCall(
+                        $actor,
+                        $actionObject,
+                        $selector,
+                        $countValue
                     );
                     break;
                 case "selectMultipleOptions":
@@ -1461,11 +1500,12 @@ class TestGenerator
                         $actionObject->getActionOrigin()
                     )[0];
                     $argRef = "\t\t\$";
-
                     $input = $this->resolveAllRuntimeReferences([$input])[0];
+                    $input = (isset($actionObject->getCustomActionAttributes()['unique'])) ?
+                        $this->getUniqueIdForInput($actionObject->getCustomActionAttributes()['unique'], $input)
+                        : $input;
                     $argRef .= str_replace(ucfirst($fieldKey), "", $stepKey) .
                         "Fields['{$fieldKey}'] = ${input};";
-
                     $testSteps .= $argRef;
                     break;
                 case "generateDate":
@@ -1508,8 +1548,22 @@ class TestGenerator
             }
             $testSteps .= PHP_EOL;
         }
-
         return $testSteps;
+    }
+
+    /**
+     * Get unique value appended to input string
+     *
+     * @param string $uniqueValue
+     * @param string $input
+     * @return string
+     */
+    public function getUniqueIdForInput($uniqueValue, $input)
+    {
+        $input = ($uniqueValue == 'prefix')
+            ? '"'.uniqid().str_replace('"', '', $input).'"'
+            : '"'.str_replace('"', '', $input).uniqid().'"';
+        return $input;
     }
 
     /**
@@ -1769,6 +1823,32 @@ class TestGenerator
                 throw new TestReferenceException($e->getMessage() . " in Element \"" . $type . "\"");
             }
 
+            if ($type === 'before' && $steps) {
+                $steps = sprintf(
+                    "\t\t$%s->comment('[%s]');" . PHP_EOL,
+                    'I',
+                    'START BEFORE HOOK'
+                ) . $steps;
+                $steps = $steps . sprintf(
+                    "\t\t$%s->comment('[%s]');" . PHP_EOL,
+                    'I',
+                    'END BEFORE HOOK'
+                );
+            }
+
+            if ($type === 'after' && $steps) {
+                $steps = sprintf(
+                    "\t\t$%s->comment('[%s]');" . PHP_EOL,
+                    'I',
+                    'START AFTER HOOK'
+                ) . $steps;
+                $steps = $steps . sprintf(
+                    "\t\t$%s->comment('[%s]');" . PHP_EOL,
+                    'I',
+                    'END AFTER HOOK'
+                );
+            }
+
             $hooks .= sprintf("\tpublic function _{$type}(%s)\n", $dependencies);
             $hooks .= "\t{\n";
             $hooks .= $steps;
@@ -1798,7 +1878,7 @@ class TestGenerator
 
         $testName = $test->getName();
         $testName = str_replace(' ', '', $testName);
-        $testAnnotations = $this->generateAnnotationsPhp($test->getAnnotations(), true);
+        $testAnnotations = $this->generateAnnotationsPhp($test, true);
         $dependencies = 'AcceptanceTester $I';
         if (!$test->isSkipped() || MftfApplicationConfig::getConfig()->allowSkipped()) {
             try {
@@ -1833,7 +1913,6 @@ class TestGenerator
             $testPhp .= "\t\t\$this->isSuccess = true;" . PHP_EOL;
             $testPhp .= "\t}\n";
         }
-
         return $testPhp;
     }
 
@@ -2006,6 +2085,24 @@ class TestGenerator
     }
 
     /**
+     * Check if the entity exists
+     *
+     * @param string $entity
+     * @param string $stepKey
+     * @return void
+     * @throws TestReferenceException
+     */
+    public function entityExistsCheck($entity, $stepKey)
+    {
+        $retrievedEntity = DataObjectHandler::getInstance()->getObject($entity);
+        if ($retrievedEntity === null) {
+            throw new TestReferenceException(
+                "Test generation failed as entity \"" . $entity . "\" does not exist. at stepkey ".$stepKey
+            );
+        }
+    }
+
+    /**
      * Wrap parameters into a function call.
      *
      * @param string       $actor
@@ -2016,16 +2113,7 @@ class TestGenerator
      */
     private function wrapFunctionCall($actor, $action, ...$args)
     {
-        $isFirst = true;
-        $isActionHelper = $action->getType() === 'helper';
-        $actionType = $action->getType();
-        if ($isActionHelper) {
-            $actor = "this->helperContainer->get('" . $action->getCustomActionAttributes()['class'] . "')";
-            $args = $args[0];
-            $actionType = $action->getCustomActionAttributes()['method'];
-        }
-
-        $output = sprintf("\t\t$%s->%s(", $actor, $actionType);
+        $output = sprintf("\t\t$%s->%s(", $actor, $action->getType());
         for ($i = 0; $i < count($args); $i++) {
             if (null === $args[$i]) {
                 continue;
@@ -2046,17 +2134,22 @@ class TestGenerator
     /**
      * Wrap parameters into a function call with a return value.
      *
-     * @param string $returnVariable
-     * @param string $actor
-     * @param string $action
-     * @param array  ...$args
+     * @param string       $returnVariable
+     * @param string       $actor
+     * @param actionObject $action
+     * @param array        ...$args
      * @return string
      * @throws \Exception
      */
     private function wrapFunctionCallWithReturnValue($returnVariable, $actor, $action, ...$args)
     {
-        $isFirst = true;
-        $output = sprintf("\t\t$%s = $%s->%s(", $returnVariable, $actor, $action->getType());
+        $actionType = $action->getType();
+        if ($actionType === 'helper') {
+            $actor = "this->helperContainer->get('" . $action->getCustomActionAttributes()['class'] . "')";
+            $args = $args[0];
+            $actionType = $action->getCustomActionAttributes()['method'];
+        }
+        $output = sprintf("\t\t$%s = $%s->%s(", $returnVariable, $actor, $actionType);
         for ($i = 0; $i < count($args); $i++) {
             if (null === $args[$i]) {
                 continue;
@@ -2100,18 +2193,18 @@ class TestGenerator
 
         foreach ($args as $key => $arg) {
             $newArgs[$key] = $arg;
-            preg_match_all($regex, $arg, $matches);
-            if (!empty($matches[0])) {
-                foreach ($matches[0] as $matchKey => $fullMatch) {
-                    $refVariable = $matches[1][$matchKey];
-
-                    $replacement = $this->getReplacement($func, $refVariable);
-
-                    $outputArg = $this->processQuoteBreaks($fullMatch, $newArgs[$key], $replacement);
-                    $newArgs[$key] = $outputArg;
+            if ($arg !== null) {
+                preg_match_all($regex, $arg, $matches);
+                if (!empty($matches[0])) {
+                    foreach ($matches[0] as $matchKey => $fullMatch) {
+                        $refVariable = $matches[1][$matchKey];
+                        $replacement = $this->getReplacement($func, $refVariable);
+                        $outputArg = $this->processQuoteBreaks($fullMatch, $newArgs[$key], $replacement);
+                        $newArgs[$key] = $outputArg;
+                    }
+                    unset($matches);
+                    continue;
                 }
-                unset($matches);
-                continue;
             }
         }
 
@@ -2301,6 +2394,7 @@ class TestGenerator
                 'excludes' => [
                     'dontSeeCookie',
                     'grabCookie',
+                    'grabCookieAttributes',
                     'resetCookie',
                     'seeCookie',
                     'setCookie',

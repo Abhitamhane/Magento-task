@@ -6,7 +6,8 @@ namespace Rector\PhpAttribute\AnnotationToAttributeMapper;
 use PhpParser\Node\Expr;
 use Rector\PhpAttribute\AnnotationToAttributeMapper;
 use Rector\PhpAttribute\Contract\AnnotationToAttributeMapperInterface;
-use RectorPrefix20211213\Symfony\Contracts\Service\Attribute\Required;
+use Rector\PhpAttribute\Enum\DocTagNodeState;
+use RectorPrefix20211221\Symfony\Contracts\Service\Attribute\Required;
 /**
  * @implements AnnotationToAttributeMapperInterface<mixed[]>
  */
@@ -37,8 +38,26 @@ final class ArrayAnnotationToAttributeMapper implements \Rector\PhpAttribute\Con
      */
     public function map($value)
     {
-        return \array_map(function ($item) {
+        $values = \array_map(function ($item) {
             return $this->annotationToAttributeMapper->map($item);
         }, $value);
+        foreach ($values as $key => $value) {
+            // remove the key and value? useful in case of unwrapping nested attributes
+            if (!$this->isRemoveArrayPlaceholder($value)) {
+                continue;
+            }
+            unset($values[$key]);
+        }
+        return $values;
+    }
+    /**
+     * @param mixed[]|\PhpParser\Node\Expr $value
+     */
+    private function isRemoveArrayPlaceholder($value) : bool
+    {
+        if (!\is_array($value)) {
+            return \false;
+        }
+        return \in_array(\Rector\PhpAttribute\Enum\DocTagNodeState::REMOVE_ARRAY, $value, \true);
     }
 }

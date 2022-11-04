@@ -21,6 +21,8 @@ use Aws\EndpointDiscovery\ConfigurationProvider;
 use Aws\Exception\InvalidRegionException;
 use Aws\Retry\ConfigurationInterface as RetryConfigInterface;
 use Aws\Retry\ConfigurationProvider as RetryConfigProvider;
+use Aws\DefaultsMode\ConfigurationInterface as ConfigModeInterface;
+use Aws\DefaultsMode\ConfigurationProvider as ConfigModeProvider;
 use Aws\Signature\SignatureProvider;
 use Aws\Endpoint\EndpointProvider;
 use GuzzleHttp\Promise\PromiseInterface;
@@ -104,6 +106,13 @@ class ClientResolver
             'doc'      => 'An optional PHP callable that accepts a type, service, and version argument, and returns an array of corresponding configuration data. The type value can be one of api, waiter, or paginator.',
             'fn'       => [__CLASS__, '_apply_api_provider'],
             'default'  => [ApiProvider::class, 'defaultProvider'],
+        ],
+        'configuration_mode' => [
+            'type'    => 'value',
+            'valid'   => [ConfigModeInterface::class, CacheInterface::class, 'string', 'closure'],
+            'doc'     => "Sets the default configuration mode. Otherwise provide an instance of Aws\DefaultsMode\ConfigurationInterface, an instance of  Aws\CacheInterface, or a string containing a valid mode",
+            'fn'      => [__CLASS__, '_apply_defaults'],
+            'default' => [ConfigModeProvider::class, 'defaultProvider']
         ],
         'use_fips_endpoint' => [
             'type'      => 'value',
@@ -453,6 +462,44 @@ class ClientResolver
         }
     }
 
+    public static function _apply_defaults($value, array &$args, HandlerList $list)
+    {
+        $config = ConfigModeProvider::unwrap($value);
+        if ($config->getMode() !== 'legacy') {
+            if (!isset($args['retries']) && !is_null($config->getRetryMode())) {
+                $args['retries'] = ['mode' => $config->getRetryMode()];
+            }
+            if (
+                !isset($args['sts_regional_endpoints'])
+                && !is_null($config->getStsRegionalEndpoints())
+            ) {
+                $args['sts_regional_endpoints'] = ['mode' => $config->getStsRegionalEndpoints()];
+            }
+            if (
+                !isset($args['s3_us_east_1_regional_endpoint'])
+                && !is_null($config->getS3UsEast1RegionalEndpoints())
+            ) {
+                $args['s3_us_east_1_regional_endpoint'] = ['mode' => $config->getS3UsEast1RegionalEndpoints()];
+            }
+
+            if (!isset($args['http'])) {
+                $args['http'] = [];
+            }
+            if (
+                !isset($args['http']['connect_timeout'])
+                && !is_null($config->getConnectTimeoutInMillis())
+            ) {
+                $args['http']['connect_timeout'] = $config->getConnectTimeoutInMillis() / 1000;
+            }
+            if (
+                !isset($args['http']['timeout'])
+                && !is_null($config->getHttpRequestTimeoutInMillis())
+            ) {
+                $args['http']['timeout'] = $config->getHttpRequestTimeoutInMillis() / 1000;
+            }
+        }
+    }
+
     public static function _apply_credentials($value, array &$args)
     {
         if (is_callable($value)) {
@@ -748,15 +795,12 @@ class ClientResolver
     public static function _apply_user_agent($inputUserAgent, array &$args, HandlerList $list)
     {
         //Add SDK version
-        $xAmzUserAgent = ['aws-sdk-php/' . Sdk::VERSION];
+        $userAgent = ['aws-sdk-php/' . Sdk::VERSION];
 
         //If on HHVM add the HHVM version
         if (defined('HHVM_VERSION')) {
-            $xAmzUserAgent []= 'HHVM/' . HHVM_VERSION;
+            $userAgent []= 'HHVM/' . HHVM_VERSION;
         }
-
-        //Set up the updated user agent
-        $legacyUserAgent = $xAmzUserAgent;
 
         //Add OS version
         $disabledFunctions = explode(',', ini_get('disable_functions'));
@@ -765,16 +809,16 @@ class ClientResolver
         ) {
             $osName = "OS/" . php_uname('s') . '/' . php_uname('r');
             if (!empty($osName)) {
-                $legacyUserAgent []= $osName;
+                $userAgent []= $osName;
             }
         }
 
         //Add the language version
-        $legacyUserAgent []= 'lang/php/' . phpversion();
+        $userAgent []= 'lang/php/' . phpversion();
 
         //Add exec environment if present
         if ($executionEnvironment = getenv('AWS_EXECUTION_ENV')) {
-            $legacyUserAgent []= $executionEnvironment;
+            $userAgent []= $executionEnvironment;
         }
 
         //Add the input to the end
@@ -783,32 +827,28 @@ class ClientResolver
                 $inputUserAgent = [$inputUserAgent];
             }
             $inputUserAgent = array_map('strval', $inputUserAgent);
-            $legacyUserAgent = array_merge($legacyUserAgent, $inputUserAgent);
-            $xAmzUserAgent = array_merge($xAmzUserAgent, $inputUserAgent);
+            $userAgent = array_merge($userAgent, $inputUserAgent);
         }
 
-        $args['ua_append'] = $legacyUserAgent;
+        $args['ua_append'] = $userAgent;
 
-        $list->appendBuild(static function (callable $handler) use (
-            $xAmzUserAgent,
-            $legacyUserAgent
-        ) {
+        $list->appendBuild(static function (callable $handler) use ($userAgent) {
             return function (
                 CommandInterface $command,
                 RequestInterface $request
-            ) use ($handler, $legacyUserAgent, $xAmzUserAgent) {
+            ) use ($handler, $userAgent) {
                 return $handler(
                     $command,
                     $request->withHeader(
                         'X-Amz-User-Agent',
                         implode(' ', array_merge(
-                            $xAmzUserAgent,
+                            $userAgent,
                             $request->getHeader('X-Amz-User-Agent')
                         ))
                     )->withHeader(
                         'User-Agent',
                         implode(' ', array_merge(
-                            $legacyUserAgent,
+                            $userAgent,
                             $request->getHeader('User-Agent')
                         ))
                     )

@@ -2,6 +2,58 @@
 
 All notable changes to this project will be documented in this file, in reverse chronological order by release.
 
+## 3.6.0 - 2022-10-11
+
+
+-----
+
+### Release Notes for [3.6.0](https://github.com/laminas/laminas-eventmanager/milestone/9)
+
+Feature release (minor)
+
+### 3.6.0
+
+- Total issues resolved: **1**
+- Total pull requests resolved: **4**
+- Total contributors: **3**
+
+#### Enhancement
+
+ - [31: Add support for PHP 8.2, Remove support for PHP 7.4](https://github.com/laminas/laminas-eventmanager/pull/31) thanks to @gsteel
+ - [29: Setup Psalm](https://github.com/laminas/laminas-eventmanager/pull/29) thanks to @gsteel and @boesing
+
+#### Awaiting Maintainer Response,renovate
+
+ - [28: chore(deps): update dependency laminas/laminas-coding-standard to ~2.3.0 - autoclosed](https://github.com/laminas/laminas-eventmanager/pull/28) thanks to @renovate[bot]
+
+#### renovate
+
+ - [26: Configure Renovate](https://github.com/laminas/laminas-eventmanager/pull/26) thanks to @renovate[bot]
+
+## 3.5.0 - 2022-04-06
+
+
+-----
+
+### Release Notes for [3.5.0](https://github.com/laminas/laminas-eventmanager/milestone/7)
+
+### Changed
+
+The `LazyListener`, `LazyEventListener`, and `LazyListenerAggregate` have type-widened their `$container` argument to the official [PSR-11](https://www.php-fig.org/psr/psr-11/) `ContainerInterface` type. Since they previously hinted against the container-interop version 1.2 or greater, and that version extended the PSR-11 interface, the change is backwards compatible.
+
+If you were extending these classes, we recommend updating your definitions to reference PSR-11's types instead.
+
+### 3.5.0
+
+- Total issues resolved: **0**
+- Total pull requests resolved: **2**
+- Total contributors: **2**
+
+#### Enhancement
+
+ - [25: Update to PSR-11 for lazy listener support](https://github.com/laminas/laminas-eventmanager/pull/25) thanks to @weierophinney
+ - [24: Prepare for Renovate with reusable workflows](https://github.com/laminas/laminas-eventmanager/pull/24) thanks to @ghostwriter
+
 ## 3.4.0 - 2021-09-07
 
 

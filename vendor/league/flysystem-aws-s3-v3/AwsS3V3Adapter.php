@@ -169,6 +169,10 @@ class AwsS3V3Adapter implements FilesystemAdapter
     {
         $options = [];
 
+        if ($mimetype = $config->get('mimetype')) {
+            $options['ContentType'] = $mimetype;
+        }
+
         foreach (static::AVAILABLE_OPTIONS as $option) {
             $value = $config->get($option, '__NOT_SET__');
 
@@ -390,7 +394,7 @@ class AwsS3V3Adapter implements FilesystemAdapter
     {
         try {
             /** @var string $visibility */
-            $visibility = $this->visibility($source)->visibility();
+            $visibility = $config->get(Config::OPTION_VISIBILITY) ?: $this->visibility($source)->visibility();
         } catch (Throwable $exception) {
             throw UnableToCopyFile::fromLocationTo(
                 $source,

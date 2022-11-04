@@ -18,10 +18,9 @@ use Rector\Core\Configuration\Option;
 use Rector\Core\Exception\ShouldNotHappenException;
 use Rector\NodeTypeResolver\Reflection\BetterReflection\SourceLocatorProvider\DynamicSourceLocatorProvider;
 use ReflectionClass;
-use RectorPrefix20211213\Symplify\PackageBuilder\Parameter\ParameterProvider;
+use RectorPrefix20211221\Symplify\PackageBuilder\Parameter\ParameterProvider;
 /**
  * Factory so Symfony app can use services from PHPStan container
- * @see packages/NodeTypeResolver/config/config.yaml:17
  */
 final class PHPStanServicesFactory
 {
@@ -30,7 +29,7 @@ final class PHPStanServicesFactory
      * @var \PHPStan\DependencyInjection\Container
      */
     private $container;
-    public function __construct(\RectorPrefix20211213\Symplify\PackageBuilder\Parameter\ParameterProvider $parameterProvider)
+    public function __construct(\RectorPrefix20211221\Symplify\PackageBuilder\Parameter\ParameterProvider $parameterProvider)
     {
         $containerFactory = new \PHPStan\DependencyInjection\ContainerFactory(\getcwd());
         $additionalConfigFiles = [];
@@ -112,7 +111,7 @@ final class PHPStanServicesFactory
     private function resolveExtensionConfigs() : array
     {
         // same logic as in PHPStan for extension installed - https://github.com/phpstan/phpstan-src/blob/5956ec4f6cd09c8d7db9466ed4e7f25706f37a43/src/Command/CommandHelper.php#L195-L222
-        if (!\class_exists('PHPStan\\ExtensionInstaller\\GeneratedConfig')) {
+        if (!\class_exists(\PHPStan\ExtensionInstaller\GeneratedConfig::class)) {
             return [];
         }
         $reflectionClass = new \ReflectionClass(\PHPStan\ExtensionInstaller\GeneratedConfig::class);

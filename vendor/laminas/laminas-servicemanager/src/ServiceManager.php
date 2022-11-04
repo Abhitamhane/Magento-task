@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Laminas\ServiceManager;
 
 use Exception;
-use Interop\Container\ContainerInterface;
-use Interop\Container\Exception\ContainerException;
 use Laminas\ServiceManager\Exception\ContainerModificationsNotAllowedException;
 use Laminas\ServiceManager\Exception\CyclicAliasException;
 use Laminas\ServiceManager\Exception\InvalidArgumentException;
@@ -19,12 +17,13 @@ use ProxyManager\Factory\LazyLoadingValueHolderFactory;
 use ProxyManager\FileLocator\FileLocator;
 use ProxyManager\GeneratorStrategy\EvaluatingGeneratorStrategy;
 use ProxyManager\GeneratorStrategy\FileWriterGeneratorStrategy;
+use Psr\Container\ContainerExceptionInterface;
+use Psr\Container\ContainerInterface;
 
 use function array_intersect;
 use function array_key_exists;
 use function array_keys;
 use function class_exists;
-use function get_class;
 use function gettype;
 use function in_array;
 use function is_callable;
@@ -158,7 +157,6 @@ class ServiceManager implements ServiceLocatorInterface
      * See {@see \Laminas\ServiceManager\ServiceManager::configure()} for details
      * on what $config accepts.
      *
-     * @param array $config
      * @psalm-param ServiceManagerConfiguration $config
      */
     public function __construct(array $config = [])
@@ -186,9 +184,7 @@ class ServiceManager implements ServiceLocatorInterface
         return $this->creationContext;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public function get($name)
     {
         // We start by checking if we have cached the requested service;
@@ -247,9 +243,7 @@ class ServiceManager implements ServiceLocatorInterface
         return $object;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public function build($name, ?array $options = null)
     {
         // We never cache when using "build".
@@ -259,6 +253,9 @@ class ServiceManager implements ServiceLocatorInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @param string|class-string $name
+     * @return bool
      */
     public function has($name)
     {
@@ -287,7 +284,6 @@ class ServiceManager implements ServiceLocatorInterface
     }
 
     /**
-     * @param  array $config
      * @psalm-param ServiceManagerConfiguration $config
      * @return self
      * @throws ContainerModificationsNotAllowedException If the allow
@@ -402,7 +398,7 @@ class ServiceManager implements ServiceLocatorInterface
      * @param string $name Service name
      * @param string|callable|Factory\FactoryInterface $factory  Factory to which to map.
      * phpcs:disable Generic.Files.LineLength.TooLong
-     * @psalm-param class-string<Factory\FactoryInterface>|callable(ContainerInterface,string,array<mixed>|null)|Factory\FactoryInterface $factory
+     * @psalm-param class-string<Factory\FactoryInterface>|callable(ContainerInterface,string,array<mixed>|null):object|Factory\FactoryInterface $factory
      * phpcs:enable Generic.Files.LineLength.TooLong
      * @return void
      * @throws ContainerModificationsNotAllowedException If $name already
@@ -539,7 +535,6 @@ class ServiceManager implements ServiceLocatorInterface
         }
 
         if (is_callable($factory)) {
-            /** @psalm-var callable(ContainerInterface,string,array<mixed>|null):object $factory */
             if ($lazyLoaded) {
                 $this->factories[$name] = $factory;
             }
@@ -602,7 +597,7 @@ class ServiceManager implements ServiceLocatorInterface
      * @return object
      * @throws ServiceNotFoundException If unable to resolve the service.
      * @throws ServiceNotCreatedException If an exception is raised when creating a service.
-     * @throws ContainerException If any other error occurs.
+     * @throws ContainerExceptionInterface If any other error occurs.
      */
     private function doCreate(string $resolvedName, ?array $options = null)
     {
@@ -614,7 +609,7 @@ class ServiceManager implements ServiceLocatorInterface
             } else {
                 $object = $this->createDelegatorFromName($resolvedName, $options);
             }
-        } catch (ContainerException $exception) {
+        } catch (ContainerExceptionInterface $exception) {
             throw $exception;
         } catch (Exception $exception) {
             throw new ServiceNotCreatedException(sprintf(
@@ -750,7 +745,7 @@ class ServiceManager implements ServiceLocatorInterface
 
         if (isset($config['services'])) {
             foreach (array_keys($config['services']) as $service) {
-                if (isset($this->services[$service]) && ! $this->allowOverride) {
+                if (isset($this->services[$service])) {
                     throw ContainerModificationsNotAllowedException::fromExistingService($service);
                 }
             }
@@ -758,7 +753,7 @@ class ServiceManager implements ServiceLocatorInterface
 
         if (isset($config['aliases'])) {
             foreach (array_keys($config['aliases']) as $service) {
-                if (isset($this->services[$service]) && ! $this->allowOverride) {
+                if (isset($this->services[$service])) {
                     throw ContainerModificationsNotAllowedException::fromExistingService($service);
                 }
             }
@@ -766,7 +761,7 @@ class ServiceManager implements ServiceLocatorInterface
 
         if (isset($config['invokables'])) {
             foreach (array_keys($config['invokables']) as $service) {
-                if (isset($this->services[$service]) && ! $this->allowOverride) {
+                if (isset($this->services[$service])) {
                     throw ContainerModificationsNotAllowedException::fromExistingService($service);
                 }
             }
@@ -774,7 +769,7 @@ class ServiceManager implements ServiceLocatorInterface
 
         if (isset($config['factories'])) {
             foreach (array_keys($config['factories']) as $service) {
-                if (isset($this->services[$service]) && ! $this->allowOverride) {
+                if (isset($this->services[$service])) {
                     throw ContainerModificationsNotAllowedException::fromExistingService($service);
                 }
             }
@@ -782,7 +777,7 @@ class ServiceManager implements ServiceLocatorInterface
 
         if (isset($config['delegators'])) {
             foreach (array_keys($config['delegators']) as $service) {
-                if (isset($this->services[$service]) && ! $this->allowOverride) {
+                if (isset($this->services[$service])) {
                     throw ContainerModificationsNotAllowedException::fromExistingService($service);
                 }
             }
@@ -790,7 +785,7 @@ class ServiceManager implements ServiceLocatorInterface
 
         if (isset($config['shared'])) {
             foreach (array_keys($config['shared']) as $service) {
-                if (isset($this->services[$service]) && ! $this->allowOverride) {
+                if (isset($this->services[$service])) {
                     throw ContainerModificationsNotAllowedException::fromExistingService($service);
                 }
             }
@@ -798,7 +793,7 @@ class ServiceManager implements ServiceLocatorInterface
 
         if (isset($config['lazy_services']['class_map'])) {
             foreach (array_keys($config['lazy_services']['class_map']) as $service) {
-                if (isset($this->services[$service]) && ! $this->allowOverride) {
+                if (isset($this->services[$service])) {
                     throw ContainerModificationsNotAllowedException::fromExistingService($service);
                 }
             }
@@ -974,7 +969,7 @@ class ServiceManager implements ServiceLocatorInterface
         }
         throw new ServiceNotCreatedException(sprintf(
             'A non-callable delegator, "%s", was provided; expected a callable or instance of "%s"',
-            is_object($delegatorFactory) ? get_class($delegatorFactory) : gettype($delegatorFactory),
+            is_object($delegatorFactory) ? $delegatorFactory::class : gettype($delegatorFactory),
             DelegatorFactoryInterface::class
         ));
     }

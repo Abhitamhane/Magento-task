@@ -29,10 +29,10 @@ use Rector\Core\PhpParser\Node\BetterNodeFinder;
 use Rector\Core\ValueObject\PhpVersionFeature;
 use Rector\StaticTypeMapper\ValueObject\Type\FullyQualifiedObjectType;
 use Rector\TypeDeclaration\Contract\TypeInferer\ReturnTypeInfererInterface;
-use Rector\TypeDeclaration\Sorter\TypeInfererSorter;
+use Rector\TypeDeclaration\Sorter\PriorityAwareSorter;
 use Rector\TypeDeclaration\TypeAnalyzer\GenericClassStringTypeNormalizer;
 use Rector\TypeDeclaration\TypeNormalizer;
-use RectorPrefix20211213\Symplify\PackageBuilder\Parameter\ParameterProvider;
+use RectorPrefix20211221\Symplify\PackageBuilder\Parameter\ParameterProvider;
 final class ReturnTypeInferer
 {
     /**
@@ -72,7 +72,7 @@ final class ReturnTypeInferer
     /**
      * @param ReturnTypeInfererInterface[] $returnTypeInferers
      */
-    public function __construct(array $returnTypeInferers, \Rector\TypeDeclaration\TypeNormalizer $typeNormalizer, \Rector\TypeDeclaration\Sorter\TypeInfererSorter $typeInfererSorter, \Rector\TypeDeclaration\TypeAnalyzer\GenericClassStringTypeNormalizer $genericClassStringTypeNormalizer, \Rector\Core\Php\PhpVersionProvider $phpVersionProvider, \RectorPrefix20211213\Symplify\PackageBuilder\Parameter\ParameterProvider $parameterProvider, \Rector\Core\PhpParser\Node\BetterNodeFinder $betterNodeFinder, \PHPStan\Reflection\ReflectionProvider $reflectionProvider)
+    public function __construct(array $returnTypeInferers, \Rector\TypeDeclaration\TypeNormalizer $typeNormalizer, \Rector\TypeDeclaration\Sorter\PriorityAwareSorter $priorityAwareSorter, \Rector\TypeDeclaration\TypeAnalyzer\GenericClassStringTypeNormalizer $genericClassStringTypeNormalizer, \Rector\Core\Php\PhpVersionProvider $phpVersionProvider, \RectorPrefix20211221\Symplify\PackageBuilder\Parameter\ParameterProvider $parameterProvider, \Rector\Core\PhpParser\Node\BetterNodeFinder $betterNodeFinder, \PHPStan\Reflection\ReflectionProvider $reflectionProvider)
     {
         $this->typeNormalizer = $typeNormalizer;
         $this->genericClassStringTypeNormalizer = $genericClassStringTypeNormalizer;
@@ -80,7 +80,7 @@ final class ReturnTypeInferer
         $this->parameterProvider = $parameterProvider;
         $this->betterNodeFinder = $betterNodeFinder;
         $this->reflectionProvider = $reflectionProvider;
-        $this->returnTypeInferers = $typeInfererSorter->sort($returnTypeInferers);
+        $this->returnTypeInferers = $priorityAwareSorter->sort($returnTypeInferers);
     }
     public function inferFunctionLike(\PhpParser\Node\FunctionLike $functionLike) : \PHPStan\Type\Type
     {

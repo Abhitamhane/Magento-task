@@ -49,7 +49,10 @@ return [
                 'id_prefix' => 'b6e_'
             ]
         ],
-        'allow_parallel_generation' => false
+        'allow_parallel_generation' => false,
+        'graphql' => [
+            'id_salt' => 'cMwlLlrvWtWo7N3K0q68gEerq02osoUA'
+        ]
     ],
     'lock' => [
         'provider' => 'db',

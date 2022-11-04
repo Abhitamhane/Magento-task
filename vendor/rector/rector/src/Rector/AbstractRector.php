@@ -44,11 +44,11 @@ use Rector\NodeTypeResolver\NodeTypeResolver;
 use Rector\PostRector\Collector\NodesToAddCollector;
 use Rector\PostRector\Collector\NodesToRemoveCollector;
 use Rector\StaticTypeMapper\StaticTypeMapper;
-use RectorPrefix20211213\Symfony\Component\Console\Style\SymfonyStyle;
-use RectorPrefix20211213\Symfony\Contracts\Service\Attribute\Required;
-use RectorPrefix20211213\Symplify\Astral\NodeTraverser\SimpleCallableNodeTraverser;
-use RectorPrefix20211213\Symplify\PackageBuilder\Parameter\ParameterProvider;
-use RectorPrefix20211213\Symplify\Skipper\Skipper\Skipper;
+use RectorPrefix20211221\Symfony\Component\Console\Style\SymfonyStyle;
+use RectorPrefix20211221\Symfony\Contracts\Service\Attribute\Required;
+use RectorPrefix20211221\Symplify\Astral\NodeTraverser\SimpleCallableNodeTraverser;
+use RectorPrefix20211221\Symplify\PackageBuilder\Parameter\ParameterProvider;
+use RectorPrefix20211221\Symplify\Skipper\Skipper\Skipper;
 /**
  * @see \Rector\Testing\PHPUnit\AbstractRectorTestCase
  */
@@ -173,7 +173,7 @@ abstract class AbstractRector extends \PhpParser\NodeVisitorAbstract implements 
     /**
      * @required
      */
-    public function autowire(\Rector\PostRector\Collector\NodesToRemoveCollector $nodesToRemoveCollector, \Rector\PostRector\Collector\NodesToAddCollector $nodesToAddCollector, \Rector\NodeRemoval\NodeRemover $nodeRemover, \Rector\Core\Application\FileSystem\RemovedAndAddedFilesCollector $removedAndAddedFilesCollector, \Rector\Core\PhpParser\Printer\BetterStandardPrinter $betterStandardPrinter, \Rector\NodeNameResolver\NodeNameResolver $nodeNameResolver, \Rector\NodeTypeResolver\NodeTypeResolver $nodeTypeResolver, \RectorPrefix20211213\Symplify\Astral\NodeTraverser\SimpleCallableNodeTraverser $simpleCallableNodeTraverser, \Rector\Core\PhpParser\Node\NodeFactory $nodeFactory, \Rector\BetterPhpDocParser\PhpDocInfo\PhpDocInfoFactory $phpDocInfoFactory, \RectorPrefix20211213\Symfony\Component\Console\Style\SymfonyStyle $symfonyStyle, \Rector\Core\Php\PhpVersionProvider $phpVersionProvider, \Rector\Core\Exclusion\ExclusionManager $exclusionManager, \Rector\StaticTypeMapper\StaticTypeMapper $staticTypeMapper, \RectorPrefix20211213\Symplify\PackageBuilder\Parameter\ParameterProvider $parameterProvider, \Rector\Core\Logging\CurrentRectorProvider $currentRectorProvider, \Rector\Core\Configuration\CurrentNodeProvider $currentNodeProvider, \RectorPrefix20211213\Symplify\Skipper\Skipper\Skipper $skipper, \Rector\Core\PhpParser\Node\Value\ValueResolver $valueResolver, \Rector\Core\PhpParser\Node\BetterNodeFinder $betterNodeFinder, \Rector\Core\PhpParser\Comparing\NodeComparator $nodeComparator, \Rector\Core\Provider\CurrentFileProvider $currentFileProvider, \Rector\Core\NodeAnalyzer\ChangedNodeAnalyzer $changedNodeAnalyzer, \Rector\Core\Validation\InfiniteLoopValidator $infiniteLoopValidator, \Rector\Core\ProcessAnalyzer\RectifiedAnalyzer $rectifiedAnalyzer) : void
+    public function autowire(\Rector\PostRector\Collector\NodesToRemoveCollector $nodesToRemoveCollector, \Rector\PostRector\Collector\NodesToAddCollector $nodesToAddCollector, \Rector\NodeRemoval\NodeRemover $nodeRemover, \Rector\Core\Application\FileSystem\RemovedAndAddedFilesCollector $removedAndAddedFilesCollector, \Rector\Core\PhpParser\Printer\BetterStandardPrinter $betterStandardPrinter, \Rector\NodeNameResolver\NodeNameResolver $nodeNameResolver, \Rector\NodeTypeResolver\NodeTypeResolver $nodeTypeResolver, \RectorPrefix20211221\Symplify\Astral\NodeTraverser\SimpleCallableNodeTraverser $simpleCallableNodeTraverser, \Rector\Core\PhpParser\Node\NodeFactory $nodeFactory, \Rector\BetterPhpDocParser\PhpDocInfo\PhpDocInfoFactory $phpDocInfoFactory, \RectorPrefix20211221\Symfony\Component\Console\Style\SymfonyStyle $symfonyStyle, \Rector\Core\Php\PhpVersionProvider $phpVersionProvider, \Rector\Core\Exclusion\ExclusionManager $exclusionManager, \Rector\StaticTypeMapper\StaticTypeMapper $staticTypeMapper, \RectorPrefix20211221\Symplify\PackageBuilder\Parameter\ParameterProvider $parameterProvider, \Rector\Core\Logging\CurrentRectorProvider $currentRectorProvider, \Rector\Core\Configuration\CurrentNodeProvider $currentNodeProvider, \RectorPrefix20211221\Symplify\Skipper\Skipper\Skipper $skipper, \Rector\Core\PhpParser\Node\Value\ValueResolver $valueResolver, \Rector\Core\PhpParser\Node\BetterNodeFinder $betterNodeFinder, \Rector\Core\PhpParser\Comparing\NodeComparator $nodeComparator, \Rector\Core\Provider\CurrentFileProvider $currentFileProvider, \Rector\Core\NodeAnalyzer\ChangedNodeAnalyzer $changedNodeAnalyzer, \Rector\Core\Validation\InfiniteLoopValidator $infiniteLoopValidator, \Rector\Core\ProcessAnalyzer\RectifiedAnalyzer $rectifiedAnalyzer) : void
     {
         $this->nodesToRemoveCollector = $nodesToRemoveCollector;
         $this->nodesToAddCollector = $nodesToAddCollector;
@@ -325,23 +325,6 @@ abstract class AbstractRector extends \PhpParser\NodeVisitorAbstract implements 
     {
         $newNode->setAttribute(\Rector\NodeTypeResolver\Node\AttributeKey::PHP_DOC_INFO, $oldNode->getAttribute(\Rector\NodeTypeResolver\Node\AttributeKey::PHP_DOC_INFO));
         $newNode->setAttribute(\Rector\NodeTypeResolver\Node\AttributeKey::COMMENTS, $oldNode->getAttribute(\Rector\NodeTypeResolver\Node\AttributeKey::COMMENTS));
-    }
-    /**
-     * @deprecated Return array of stmts directly
-     * @param Stmt[] $stmts
-     */
-    protected function unwrapStmts(array $stmts, \PhpParser\Node $node) : void
-    {
-        // move /* */ doc block from if to first element to keep it
-        $currentPhpDocInfo = $this->phpDocInfoFactory->createFromNodeOrEmpty($node);
-        foreach ($stmts as $key => $ifStmt) {
-            if ($key === 0) {
-                $ifStmt->setAttribute(\Rector\NodeTypeResolver\Node\AttributeKey::PHP_DOC_INFO, $currentPhpDocInfo);
-                // move // comments
-                $ifStmt->setAttribute(\Rector\NodeTypeResolver\Node\AttributeKey::COMMENTS, $node->getComments());
-            }
-            $this->nodesToAddCollector->addNodeAfterNode($ifStmt, $node);
-        }
     }
     /**
      * @param Arg[] $currentArgs

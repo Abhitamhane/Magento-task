@@ -16,7 +16,7 @@ use PHPStan\BetterReflection\SourceLocator\Located\LocatedSource;
 use PHPStan\BetterReflection\SourceLocator\Type\SourceLocator;
 use PHPStan\Reflection\ReflectionProvider;
 use Rector\Core\PhpParser\AstResolver;
-use RectorPrefix20211213\Symfony\Contracts\Service\Attribute\Required;
+use RectorPrefix20211221\Symfony\Contracts\Service\Attribute\Required;
 /**
  * This mimics classes that PHPStan fails to find in scope, but actually has an access in static reflection.
  * Some weird bug, that crashes on parent classes.
@@ -47,13 +47,14 @@ final class ParentAttributeSourceLocator implements \PHPStan\BetterReflection\So
     }
     public function locateIdentifier(\PHPStan\BetterReflection\Reflector\Reflector $reflector, \PHPStan\BetterReflection\Identifier\Identifier $identifier) : ?\PHPStan\BetterReflection\Reflection\Reflection
     {
-        if ($identifier->getName() === 'Symfony\\Component\\DependencyInjection\\Attribute\\Autoconfigure' && $this->reflectionProvider->hasClass($identifier->getName())) {
-            $classReflection = $this->reflectionProvider->getClass($identifier->getName());
-            $class = $this->astResolver->resolveClassFromClassReflection($classReflection, $identifier->getName());
+        $identifierName = $identifier->getName();
+        if ($identifierName === 'Symfony\\Component\\DependencyInjection\\Attribute\\Autoconfigure' && $this->reflectionProvider->hasClass($identifierName)) {
+            $classReflection = $this->reflectionProvider->getClass($identifierName);
+            $class = $this->astResolver->resolveClassFromClassReflection($classReflection, $identifierName);
             if ($class === null) {
                 return null;
             }
-            $class->namespacedName = new \PhpParser\Node\Name\FullyQualified($identifier->getName());
+            $class->namespacedName = new \PhpParser\Node\Name\FullyQualified($identifierName);
             $fakeLocatedSource = new \PHPStan\BetterReflection\SourceLocator\Located\LocatedSource('virtual', null);
             $classReflector = new \PHPStan\BetterReflection\Reflector\ClassReflector($this);
             return \PHPStan\BetterReflection\Reflection\ReflectionClass::createFromNode($classReflector, $class, $fakeLocatedSource, new \PhpParser\Node\Stmt\Namespace_(new \PhpParser\Node\Name('Symfony\\Component\\DependencyInjection\\Attribute')));

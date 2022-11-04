@@ -1,0 +1,14 @@
+{
+    "Employee_Table": {
+        "column": {
+            "id_column": true,
+            "Emp_No": true,
+            "Emp_Name": true,
+            "DOB": true,
+            "Contact_No": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
+    }
+}

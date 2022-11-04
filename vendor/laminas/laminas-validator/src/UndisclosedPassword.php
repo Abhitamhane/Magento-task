@@ -40,12 +40,9 @@ final class UndisclosedPassword extends AbstractValidator
     ];
 
     // phpcs:enable
+    private ClientInterface $httpClient;
 
-    /** @var ClientInterface */
-    private $httpClient;
-
-    /** @var RequestFactoryInterface */
-    private $makeHttpRequest;
+    private RequestFactoryInterface $makeHttpRequest;
 
     public function __construct(ClientInterface $httpClient, RequestFactoryInterface $makeHttpRequest)
     {
@@ -55,9 +52,7 @@ final class UndisclosedPassword extends AbstractValidator
         $this->makeHttpRequest = $makeHttpRequest;
     }
 
-    /**
-     * @inheritDoc
-     */
+    /** {@inheritDoc} */
     public function isValid($value): bool
     {
         if (! is_string($value)) {

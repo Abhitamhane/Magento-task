@@ -5,12 +5,16 @@ namespace Rector\TypeDeclaration\Rector\Property;
 
 use PhpParser\Node;
 use PhpParser\Node\Stmt\Property;
+use PhpParser\Node\UnionType;
 use PHPStan\Type\MixedType;
 use PHPStan\Type\NullType;
+use PHPStan\Type\Type;
 use Rector\BetterPhpDocParser\PhpDocInfo\PhpDocInfo;
 use Rector\BetterPhpDocParser\PhpDocManipulator\PhpDocTypeChanger;
 use Rector\Core\Rector\AbstractRector;
-use Rector\TypeDeclaration\TypeInferer\PropertyTypeInferer;
+use Rector\Core\ValueObject\PhpVersionFeature;
+use Rector\PHPStanStaticTypeMapper\Enum\TypeKind;
+use Rector\TypeDeclaration\TypeInferer\VarDocPropertyTypeInferer;
 use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
 use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
 /**
@@ -20,17 +24,17 @@ final class PropertyTypeDeclarationRector extends \Rector\Core\Rector\AbstractRe
 {
     /**
      * @readonly
-     * @var \Rector\TypeDeclaration\TypeInferer\PropertyTypeInferer
+     * @var \Rector\TypeDeclaration\TypeInferer\VarDocPropertyTypeInferer
      */
-    private $propertyTypeInferer;
+    private $varDocPropertyTypeInferer;
     /**
      * @readonly
      * @var \Rector\BetterPhpDocParser\PhpDocManipulator\PhpDocTypeChanger
      */
     private $phpDocTypeChanger;
-    public function __construct(\Rector\TypeDeclaration\TypeInferer\PropertyTypeInferer $propertyTypeInferer, \Rector\BetterPhpDocParser\PhpDocManipulator\PhpDocTypeChanger $phpDocTypeChanger)
+    public function __construct(\Rector\TypeDeclaration\TypeInferer\VarDocPropertyTypeInferer $varDocPropertyTypeInferer, \Rector\BetterPhpDocParser\PhpDocManipulator\PhpDocTypeChanger $phpDocTypeChanger)
     {
-        $this->propertyTypeInferer = $propertyTypeInferer;
+        $this->varDocPropertyTypeInferer = $varDocPropertyTypeInferer;
         $this->phpDocTypeChanger = $phpDocTypeChanger;
     }
     public function getRuleDefinition() : \Symplify\RuleDocGenerator\ValueObject\RuleDefinition
@@ -84,12 +88,16 @@ CODE_SAMPLE
         if ($this->isVarDocAlreadySet($phpDocInfo)) {
             return null;
         }
-        $type = $this->propertyTypeInferer->inferProperty($node);
+        $type = $this->varDocPropertyTypeInferer->inferProperty($node);
         if ($type instanceof \PHPStan\Type\MixedType) {
             return null;
         }
         if (!$node->isPrivate() && $type instanceof \PHPStan\Type\NullType) {
             return null;
+        }
+        if ($this->phpVersionProvider->isAtLeastPhpVersion(\Rector\Core\ValueObject\PhpVersionFeature::TYPED_PROPERTIES)) {
+            $this->completeTypedProperty($type, $node);
+            return $node;
         }
         $this->phpDocTypeChanger->changeVarType($phpDocInfo, $type);
         return $node;
@@ -103,5 +111,22 @@ CODE_SAMPLE
             }
         }
         return \false;
+    }
+    private function completeTypedProperty(\PHPStan\Type\Type $type, \PhpParser\Node\Stmt\Property $property) : void
+    {
+        $propertyTypeNode = $this->staticTypeMapper->mapPHPStanTypeToPhpParserNode($type, \Rector\PHPStanStaticTypeMapper\Enum\TypeKind::PROPERTY());
+        if ($propertyTypeNode === null) {
+            return;
+        }
+        if ($propertyTypeNode instanceof \PhpParser\Node\UnionType) {
+            if ($this->phpVersionProvider->isAtLeastPhpVersion(\Rector\Core\ValueObject\PhpVersionFeature::UNION_TYPES)) {
+                $property->type = $propertyTypeNode;
+                return;
+            }
+            $phpDocInfo = $this->phpDocInfoFactory->createFromNodeOrEmpty($property);
+            $this->phpDocTypeChanger->changeVarType($phpDocInfo, $type);
+            return;
+        }
+        $property->type = $propertyTypeNode;
     }
 }

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Laminas\ServiceManager\Proxy;
 
-use Interop\Container\ContainerInterface;
 use Laminas\ServiceManager\Exception;
 use Laminas\ServiceManager\Factory\DelegatorFactoryInterface;
 use ProxyManager\Factory\LazyLoadingValueHolderFactory;
 use ProxyManager\Proxy\LazyLoadingInterface;
 use ProxyManager\Proxy\VirtualProxyInterface;
+use Psr\Container\ContainerInterface;
 
 use function sprintf;
 
@@ -21,19 +21,12 @@ use function sprintf;
  */
 final class LazyServiceFactory implements DelegatorFactoryInterface
 {
-    private LazyLoadingValueHolderFactory $proxyFactory;
-
-    /** @var array<string, class-string> map of service names to class names */
-    private array $servicesMap;
-
     /**
      * @param array<string, class-string> $servicesMap A map of service names to
      *     class names of their respective classes
      */
-    public function __construct(LazyLoadingValueHolderFactory $proxyFactory, array $servicesMap)
+    public function __construct(private LazyLoadingValueHolderFactory $proxyFactory, private array $servicesMap)
     {
-        $this->proxyFactory = $proxyFactory;
-        $this->servicesMap  = $servicesMap;
     }
 
     /**
@@ -45,7 +38,7 @@ final class LazyServiceFactory implements DelegatorFactoryInterface
     public function __invoke(ContainerInterface $container, $name, callable $callback, ?array $options = null)
     {
         if (isset($this->servicesMap[$name])) {
-            $initializer = function (&$wrappedInstance, LazyLoadingInterface $proxy) use ($callback) {
+            $initializer = static function (&$wrappedInstance, LazyLoadingInterface $proxy) use ($callback): bool {
                 $proxy->setProxyInitializer(null);
                 $wrappedInstance = $callback();
 

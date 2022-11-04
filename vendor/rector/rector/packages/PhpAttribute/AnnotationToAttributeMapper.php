@@ -4,8 +4,8 @@ declare (strict_types=1);
 namespace Rector\PhpAttribute;
 
 use PhpParser\Node\Expr;
-use Rector\Core\Exception\NotImplementedYetException;
 use Rector\PhpAttribute\Contract\AnnotationToAttributeMapperInterface;
+use Rector\PhpAttribute\Enum\DocTagNodeState;
 /**
  * @see \Rector\Tests\PhpAttribute\AnnotationToAttributeMapper\AnnotationToAttributeMapperTest
  */
@@ -24,7 +24,7 @@ final class AnnotationToAttributeMapper
         $this->annotationToAttributeMappers = $annotationToAttributeMappers;
     }
     /**
-     * @return mixed[]|\PhpParser\Node\Expr
+     * @return mixed[]|\PhpParser\Node\Expr|string
      * @param mixed $value
      */
     public function map($value)
@@ -37,6 +37,6 @@ final class AnnotationToAttributeMapper
         if ($value instanceof \PhpParser\Node\Expr) {
             return $value;
         }
-        throw new \Rector\Core\Exception\NotImplementedYetException();
+        return \Rector\PhpAttribute\Enum\DocTagNodeState::REMOVE_ARRAY;
     }
 }

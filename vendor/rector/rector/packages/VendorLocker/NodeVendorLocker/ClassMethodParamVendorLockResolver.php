@@ -9,7 +9,7 @@ use PHPStan\Reflection\ClassReflection;
 use Rector\FamilyTree\Reflection\FamilyRelationsAnalyzer;
 use Rector\NodeNameResolver\NodeNameResolver;
 use Rector\NodeTypeResolver\Node\AttributeKey;
-use RectorPrefix20211213\Symplify\SmartFileSystem\Normalizer\PathNormalizer;
+use RectorPrefix20211221\Symplify\SmartFileSystem\Normalizer\PathNormalizer;
 final class ClassMethodParamVendorLockResolver
 {
     /**
@@ -27,7 +27,7 @@ final class ClassMethodParamVendorLockResolver
      * @var \Rector\FamilyTree\Reflection\FamilyRelationsAnalyzer
      */
     private $familyRelationsAnalyzer;
-    public function __construct(\Rector\NodeNameResolver\NodeNameResolver $nodeNameResolver, \RectorPrefix20211213\Symplify\SmartFileSystem\Normalizer\PathNormalizer $pathNormalizer, \Rector\FamilyTree\Reflection\FamilyRelationsAnalyzer $familyRelationsAnalyzer)
+    public function __construct(\Rector\NodeNameResolver\NodeNameResolver $nodeNameResolver, \RectorPrefix20211221\Symplify\SmartFileSystem\Normalizer\PathNormalizer $pathNormalizer, \Rector\FamilyTree\Reflection\FamilyRelationsAnalyzer $familyRelationsAnalyzer)
     {
         $this->nodeNameResolver = $nodeNameResolver;
         $this->pathNormalizer = $pathNormalizer;
@@ -111,11 +111,8 @@ final class ClassMethodParamVendorLockResolver
     }
     private function hasClassMethodLockMatchingFileName(\PHPStan\Reflection\ClassReflection $classReflection, string $methodName, string $filePathPartName) : bool
     {
-        foreach ($classReflection->getAncestors() as $ancestorClassReflection) {
-            // skip self
-            if ($ancestorClassReflection === $classReflection) {
-                continue;
-            }
+        $ancestorClassReflections = \array_merge($classReflection->getParents(), $classReflection->getInterfaces());
+        foreach ($ancestorClassReflections as $ancestorClassReflection) {
             // parent type
             if (!$ancestorClassReflection->hasNativeMethod($methodName)) {
                 continue;

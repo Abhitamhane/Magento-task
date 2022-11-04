@@ -4,8 +4,11 @@ declare (strict_types=1);
 namespace Rector\DowngradePhp74\Rector\MethodCall;
 
 use PhpParser\Node;
+use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\Instanceof_;
 use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\Ternary;
+use PhpParser\Node\Scalar\String_;
 use PHPStan\Type\ObjectType;
 use Rector\Core\Rector\AbstractRector;
 use Rector\NodeTypeResolver\Node\AttributeKey;
@@ -68,6 +71,15 @@ CODE_SAMPLE
         if ($parent instanceof \PhpParser\Node\Expr\Instanceof_) {
             return null;
         }
-        return $this->nodeFactory->createNull();
+        $args = [new \PhpParser\Node\Arg($node->var), new \PhpParser\Node\Arg(new \PhpParser\Node\Scalar\String_('getType'))];
+        $ternary = new \PhpParser\Node\Expr\Ternary($this->nodeFactory->createFuncCall('method_exists', $args), $node, $this->nodeFactory->createNull());
+        $parent = $node->getAttribute(\Rector\NodeTypeResolver\Node\AttributeKey::PARENT_NODE);
+        if (!$parent instanceof \PhpParser\Node\Expr\Ternary) {
+            return $ternary;
+        }
+        if (!$this->nodeComparator->areNodesEqual($parent, $ternary)) {
+            return $ternary;
+        }
+        return null;
     }
 }

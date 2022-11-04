@@ -4,6 +4,7 @@ declare (strict_types=1);
 namespace Rector\TypeDeclaration\TypeInferer\PropertyTypeInferer;
 
 use PhpParser\Node;
+use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Name;
 use PhpParser\Node\Name\FullyQualified;
@@ -18,6 +19,7 @@ use PHPStan\Type\ArrayType;
 use PHPStan\Type\MixedType;
 use PHPStan\Type\NullType;
 use PHPStan\Type\Type;
+use PHPStan\Type\TypeCombinator;
 use Rector\Core\NodeAnalyzer\ParamAnalyzer;
 use Rector\Core\NodeManipulator\ClassMethodPropertyFetchManipulator;
 use Rector\Core\PhpParser\Node\BetterNodeFinder;
@@ -29,9 +31,8 @@ use Rector\NodeTypeResolver\PHPStan\Type\TypeFactory;
 use Rector\StaticTypeMapper\StaticTypeMapper;
 use Rector\StaticTypeMapper\ValueObject\Type\AliasedObjectType;
 use Rector\StaticTypeMapper\ValueObject\Type\FullyQualifiedObjectType;
-use Rector\TypeDeclaration\Contract\TypeInferer\PropertyTypeInfererInterface;
-use RectorPrefix20211213\Symplify\Astral\NodeTraverser\SimpleCallableNodeTraverser;
-final class ConstructorPropertyTypeInferer implements \Rector\TypeDeclaration\Contract\TypeInferer\PropertyTypeInfererInterface
+use RectorPrefix20211221\Symplify\Astral\NodeTraverser\SimpleCallableNodeTraverser;
+final class ConstructorPropertyTypeInferer
 {
     /**
      * @readonly
@@ -78,7 +79,7 @@ final class ConstructorPropertyTypeInferer implements \Rector\TypeDeclaration\Co
      * @var \Rector\Core\NodeAnalyzer\ParamAnalyzer
      */
     private $paramAnalyzer;
-    public function __construct(\Rector\Core\NodeManipulator\ClassMethodPropertyFetchManipulator $classMethodPropertyFetchManipulator, \PHPStan\Reflection\ReflectionProvider $reflectionProvider, \Rector\NodeNameResolver\NodeNameResolver $nodeNameResolver, \RectorPrefix20211213\Symplify\Astral\NodeTraverser\SimpleCallableNodeTraverser $simpleCallableNodeTraverser, \Rector\NodeTypeResolver\PHPStan\Type\TypeFactory $typeFactory, \Rector\StaticTypeMapper\StaticTypeMapper $staticTypeMapper, \Rector\NodeTypeResolver\NodeTypeResolver $nodeTypeResolver, \Rector\Core\PhpParser\Node\BetterNodeFinder $betterNodeFinder, \Rector\Core\NodeAnalyzer\ParamAnalyzer $paramAnalyzer)
+    public function __construct(\Rector\Core\NodeManipulator\ClassMethodPropertyFetchManipulator $classMethodPropertyFetchManipulator, \PHPStan\Reflection\ReflectionProvider $reflectionProvider, \Rector\NodeNameResolver\NodeNameResolver $nodeNameResolver, \RectorPrefix20211221\Symplify\Astral\NodeTraverser\SimpleCallableNodeTraverser $simpleCallableNodeTraverser, \Rector\NodeTypeResolver\PHPStan\Type\TypeFactory $typeFactory, \Rector\StaticTypeMapper\StaticTypeMapper $staticTypeMapper, \Rector\NodeTypeResolver\NodeTypeResolver $nodeTypeResolver, \Rector\Core\PhpParser\Node\BetterNodeFinder $betterNodeFinder, \Rector\Core\NodeAnalyzer\ParamAnalyzer $paramAnalyzer)
     {
         $this->classMethodPropertyFetchManipulator = $classMethodPropertyFetchManipulator;
         $this->reflectionProvider = $reflectionProvider;
@@ -101,19 +102,28 @@ final class ConstructorPropertyTypeInferer implements \Rector\TypeDeclaration\Co
             return null;
         }
         $propertyName = $this->nodeNameResolver->getName($property);
-        $param = $this->classMethodPropertyFetchManipulator->resolveParamForPropertyFetch($classMethod, $propertyName);
-        if (!$param instanceof \PhpParser\Node\Param) {
+        // 1. direct property = param assign
+        $param = $this->classMethodPropertyFetchManipulator->findParamAssignToPropertyName($classMethod, $propertyName);
+        if ($param instanceof \PhpParser\Node\Param) {
+            if ($param->type !== null) {
+                return $this->resolveFromParamType($param, $classMethod, $propertyName);
+            }
             return null;
         }
-        // A. infer from type declaration of parameter
-        if ($param->type !== null) {
-            return $this->resolveFromParamType($param, $classMethod, $propertyName);
+        // 2. different assign
+        /** @var Expr[] $assignedExprs */
+        $assignedExprs = $this->classMethodPropertyFetchManipulator->findAssignsToPropertyName($classMethod, $propertyName);
+        $resolvedTypes = [];
+        foreach ($assignedExprs as $assignedExpr) {
+            $resolvedTypes[] = $this->nodeTypeResolver->getType($assignedExpr);
         }
-        return null;
-    }
-    public function getPriority() : int
-    {
-        return 800;
+        if ($resolvedTypes === []) {
+            return null;
+        }
+        if (\count($resolvedTypes) === 1) {
+            return $resolvedTypes[0];
+        }
+        return \PHPStan\Type\TypeCombinator::union(...$resolvedTypes);
     }
     private function resolveFromParamType(\PhpParser\Node\Param $param, \PhpParser\Node\Stmt\ClassMethod $classMethod, string $propertyName) : \PHPStan\Type\Type
     {

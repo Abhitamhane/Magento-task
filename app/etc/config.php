@@ -210,7 +210,6 @@ return [
         'Magento_Wishlist' => 1,
         'Magento_WishlistAnalytics' => 1,
         'Magento_WishlistGraphQl' => 1,
-        'Employee_Details' => 1,
-        'Mageplaza_HelloWorld' => 1
+        'Employee_Details' => 1
     ]
 ];

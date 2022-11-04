@@ -9,6 +9,7 @@ use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PHPStan\Type\IntersectionType;
+use PHPStan\Type\TypeWithClassName;
 use Rector\BetterPhpDocParser\PhpDocInfo\PhpDocInfo;
 use Rector\Core\Rector\AbstractRector;
 use Rector\Core\ValueObject\PhpVersionFeature;
@@ -31,7 +32,7 @@ final class IntersectionTypesRector extends \Rector\Core\Rector\AbstractRector i
 final class SomeClass
 {
     /**
-     * @param string&int $types
+     * @param Foo&Bar $types
      */
     public function process($types)
     {
@@ -41,7 +42,7 @@ CODE_SAMPLE
 , <<<'CODE_SAMPLE'
 final class SomeClass
 {
-    public function process(string&int $types)
+    public function process(Foo&Bar $types)
     {
     }
 }
@@ -91,6 +92,9 @@ CODE_SAMPLE
             if (!$paramType instanceof \PHPStan\Type\IntersectionType) {
                 continue;
             }
+            if (!$this->isIntersectionableType($paramType)) {
+                continue;
+            }
             $phpParserIntersectionType = $this->staticTypeMapper->mapPHPStanTypeToPhpParserNode($paramType, \Rector\PHPStanStaticTypeMapper\Enum\TypeKind::PARAM());
             if (!$phpParserIntersectionType instanceof \PhpParser\Node\IntersectionType) {
                 continue;
@@ -98,5 +102,18 @@ CODE_SAMPLE
             $param->type = $phpParserIntersectionType;
             $this->hasChanged = \true;
         }
+    }
+    /**
+     * Only class-type are supported https://wiki.php.net/rfc/pure-intersection-types#supported_types
+     */
+    private function isIntersectionableType(\PHPStan\Type\IntersectionType $intersectionType) : bool
+    {
+        foreach ($intersectionType->getTypes() as $intersectionedType) {
+            if ($intersectionedType instanceof \PHPStan\Type\TypeWithClassName) {
+                continue;
+            }
+            return \false;
+        }
+        return \true;
     }
 }

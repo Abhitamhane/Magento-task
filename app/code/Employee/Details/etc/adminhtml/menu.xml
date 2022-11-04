@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+    <menu>
+        <add id="Employee_Details::menu" title="PG Blog" module="Employee_Details" sortOrder="100" resource="Employee_Details::menu"/>
+        <add id="Employee_Details::blog" title="Blog posts" module="Employee_Details" sortOrder="10" action="pandagroup_myadmincontroller/blog" resource="Employee_Details::blog" parent="Employee_Details::menu"/>
+    </menu>
+</config>

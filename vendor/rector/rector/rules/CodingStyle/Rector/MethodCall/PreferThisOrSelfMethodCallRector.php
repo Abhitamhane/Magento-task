@@ -15,7 +15,7 @@ use Rector\Core\PhpParser\AstResolver;
 use Rector\Core\Rector\AbstractRector;
 use Symplify\RuleDocGenerator\ValueObject\CodeSample\ConfiguredCodeSample;
 use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
-use RectorPrefix20211213\Webmozart\Assert\Assert;
+use RectorPrefix20211221\Webmozart\Assert\Assert;
 /**
  * @see \Rector\Tests\CodingStyle\Rector\MethodCall\PreferThisOrSelfMethodCallRector\PreferThisOrSelfMethodCallRectorTest
  */
@@ -27,6 +27,10 @@ final class PreferThisOrSelfMethodCallRector extends \Rector\Core\Rector\Abstrac
      * @var string
      */
     public const TYPE_TO_PREFERENCE = 'type_to_preference';
+    /**
+     * @var string
+     */
+    private const THIS = 'this';
     /**
      * @var array<PreferenceSelfThis>
      */
@@ -43,7 +47,9 @@ final class PreferThisOrSelfMethodCallRector extends \Rector\Core\Rector\Abstrac
     public function getRuleDefinition() : \Symplify\RuleDocGenerator\ValueObject\RuleDefinition
     {
         return new \Symplify\RuleDocGenerator\ValueObject\RuleDefinition('Changes $this->... and static:: to self:: or vise versa for given types', [new \Symplify\RuleDocGenerator\ValueObject\CodeSample\ConfiguredCodeSample(<<<'CODE_SAMPLE'
-class SomeClass extends \PHPUnit\Framework\TestCase
+use PHPUnit\Framework\TestCase;
+
+final class SomeClass extends TestCase
 {
     public function run()
     {
@@ -52,7 +58,9 @@ class SomeClass extends \PHPUnit\Framework\TestCase
 }
 CODE_SAMPLE
 , <<<'CODE_SAMPLE'
-class SomeClass extends \PHPUnit\Framework\TestCase
+use PHPUnit\Framework\TestCase;
+
+final class SomeClass extends TestCase
 {
     public function run()
     {
@@ -92,9 +100,9 @@ CODE_SAMPLE
     public function configure(array $configuration) : void
     {
         $typeToPreference = $configuration[self::TYPE_TO_PREFERENCE] ?? $configuration;
-        \RectorPrefix20211213\Webmozart\Assert\Assert::isArray($typeToPreference);
-        \RectorPrefix20211213\Webmozart\Assert\Assert::allString(\array_keys($typeToPreference));
-        \RectorPrefix20211213\Webmozart\Assert\Assert::allIsAOf($typeToPreference, \Rector\CodingStyle\Enum\PreferenceSelfThis::class);
+        \RectorPrefix20211221\Webmozart\Assert\Assert::isArray($typeToPreference);
+        \RectorPrefix20211221\Webmozart\Assert\Assert::allString(\array_keys($typeToPreference));
+        \RectorPrefix20211221\Webmozart\Assert\Assert::allIsAOf($typeToPreference, \Rector\CodingStyle\Enum\PreferenceSelfThis::class);
         $this->typeToPreference = $typeToPreference;
     }
     /**
@@ -105,7 +113,7 @@ CODE_SAMPLE
         if ($node instanceof \PhpParser\Node\Expr\StaticCall && !$this->isNames($node->class, [\Rector\Core\Enum\ObjectReference::SELF()->getValue(), \Rector\Core\Enum\ObjectReference::STATIC()->getValue()])) {
             return null;
         }
-        if ($node instanceof \PhpParser\Node\Expr\MethodCall && !$this->isName($node->var, 'this')) {
+        if ($node instanceof \PhpParser\Node\Expr\MethodCall && !$this->isName($node->var, self::THIS)) {
             return null;
         }
         $classMethod = $this->astResolver->resolveClassMethodFromCall($node);
@@ -133,6 +141,14 @@ CODE_SAMPLE
         if ($name === null) {
             return null;
         }
-        return $this->nodeFactory->createMethodCall('this', $name, $node->args);
+        // avoid adding dynamic method call to static method
+        $classMethod = $this->betterNodeFinder->findParentByTypes($node, [\PhpParser\Node\Stmt\ClassMethod::class]);
+        if (!$classMethod instanceof \PhpParser\Node\Stmt\ClassMethod) {
+            return $this->nodeFactory->createMethodCall(self::THIS, $name, $node->args);
+        }
+        if (!$classMethod->isStatic()) {
+            return $this->nodeFactory->createMethodCall(self::THIS, $name, $node->args);
+        }
+        return null;
     }
 }
